@@ -94,6 +94,7 @@
 let stream = null;
 let captureInterval = null;
 let isScanning = false;
+let inflight = false;
 let lastToastedNames = new Set();
 let toastCooldownTimeout = null;
 
@@ -176,7 +177,8 @@ function startCaptureLoop() {
 }
 
 function sendFrameToBackend() {
-    if (!isScanning) return;
+    if (!isScanning || inflight) return;
+    inflight = true;
     
     // Render current frame to hidden canvas
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -213,6 +215,9 @@ function sendFrameToBackend() {
     .catch(err => {
         console.error(err);
         updateStatus('API connection timeout.', false);
+    })
+    .finally(() => {
+        inflight = false;
     });
 }
 

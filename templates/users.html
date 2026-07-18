@@ -1,15 +1,30 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row align-items-center mb-5">
-    <div class="col-md-8">
+<div class="row align-items-center mb-4">
+    <div class="col-md-6">
         <h1 class="display-5 fw-bold mb-2">Registered Profiles</h1>
-        <p class="lead text-muted">Manage security profiles enrolled in the database. Deleting a profile completely cleanses npy embeddings and sample images.</p>
+        <p class="lead text-muted mb-0">Manage security profiles enrolled in the database.</p>
     </div>
-    <div class="col-md-4 text-md-end">
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
         <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom px-4 py-2">
             <i class="bi bi-person-plus-fill me-2"></i>Enroll New Profile
         </a>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="row mb-4">
+    <div class="col-lg-6 col-md-8">
+        <div class="input-group">
+            <span class="input-group-text bg-transparent border-secondary text-muted">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control border-secondary bg-transparent" id="searchInput" placeholder="Search profiles by name..." autocomplete="off">
+        </div>
+    </div>
+    <div class="col-lg-6 col-md-4 d-flex align-items-center mt-2 mt-md-0">
+        <span class="text-muted small" id="profileCount"></span>
     </div>
 </div>
 
@@ -26,9 +41,16 @@
     <i class="bi bi-people display-1 text-muted mb-4 d-block"></i>
     <h3 class="fw-bold">No Profiles Found</h3>
     <p class="text-muted mb-4">The face database is currently empty. Get started by registering your first face signature.</p>
-    <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom px-4 py-2.5">
+    <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom px-4 py-2">
         <i class="bi bi-camera-fill me-2"></i>Register Face Now
     </a>
+</div>
+
+<!-- No search results state -->
+<div class="glass-panel p-5 text-center my-4 d-none" id="noResults">
+    <i class="bi bi-search display-3 text-muted mb-3 d-block"></i>
+    <h4 class="fw-bold">No Matching Profiles</h4>
+    <p class="text-muted mb-0">No profiles match your search. Try a different name.</p>
 </div>
 
 <!-- User Grid -->
@@ -62,15 +84,20 @@
 {% block scripts %}
 <script>
 let deleteTarget = '';
+let allUsers = [];
 const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
 const deleteTargetNameSpan = document.getElementById('deleteTargetName');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
 const usersLoading = document.getElementById('usersLoading');
 const emptyUsers = document.getElementById('emptyUsers');
+const noResults = document.getElementById('noResults');
 const usersGrid = document.getElementById('usersGrid');
+const searchInput = document.getElementById('searchInput');
+const profileCount = document.getElementById('profileCount');
 
 btnConfirmDelete.addEventListener('click', executeDelete);
+searchInput.addEventListener('input', filterUsers);
 
 document.addEventListener('DOMContentLoaded', loadUsers);
 
@@ -78,19 +105,22 @@ function loadUsers() {
     usersLoading.style.display = 'block';
     usersGrid.classList.add('d-none');
     emptyUsers.classList.add('d-none');
+    noResults.classList.add('d-none');
     
     fetch('/api/users')
         .then(res => res.json())
         .then(data => {
             usersLoading.style.display = 'none';
+            allUsers = data.users || [];
             
-            const users = data.users || [];
-            if (users.length === 0) {
+            if (allUsers.length === 0) {
                 emptyUsers.classList.remove('d-none');
+                profileCount.textContent = '';
                 return;
             }
             
-            renderUsersGrid(users);
+            profileCount.textContent = `${allUsers.length} profile${allUsers.length !== 1 ? 's' : ''} found`;
+            renderUsersGrid(allUsers);
             usersGrid.classList.remove('d-none');
         })
         .catch(err => {
@@ -100,6 +130,39 @@ function loadUsers() {
         });
 }
 
+function filterUsers() {
+    const query = searchInput.value.trim().toLowerCase();
+    
+    if (!query) {
+        noResults.classList.add('d-none');
+        if (allUsers.length > 0) {
+            renderUsersGrid(allUsers);
+            usersGrid.classList.remove('d-none');
+            profileCount.textContent = `${allUsers.length} profile${allUsers.length !== 1 ? 's' : ''} found`;
+        }
+        return;
+    }
+    
+    const filtered = allUsers.filter(u => u.name.toLowerCase().includes(query));
+    
+    if (filtered.length === 0) {
+        usersGrid.classList.add('d-none');
+        noResults.classList.remove('d-none');
+        profileCount.textContent = `0 of ${allUsers.length} profiles match`;
+    } else {
+        noResults.classList.add('d-none');
+        renderUsersGrid(filtered);
+        usersGrid.classList.remove('d-none');
+        profileCount.textContent = `${filtered.length} of ${allUsers.length} profiles match`;
+    }
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 function renderUsersGrid(users) {
     usersGrid.innerHTML = '';
     
@@ -107,16 +170,16 @@ function renderUsersGrid(users) {
         const col = document.createElement('div');
         col.className = 'col';
         
-        // Avatar first letter capitalized
+        const safeName = escapeHtml(user.name);
         const initial = user.name.charAt(0).toUpperCase();
         
         col.innerHTML = `
             <div class="glass-panel p-4 h-100 d-flex flex-column justify-content-between user-card">
                 <div>
                     <div class="d-flex align-items-center mb-3">
-                        <div class="user-avatar me-3">${initial}</div>
+                        <div class="user-avatar me-3">${escapeHtml(initial)}</div>
                         <div>
-                            <h4 class="fw-bold mb-1 text-truncate" style="max-width: 180px;" title="${user.name}">${user.name}</h4>
+                            <h4 class="fw-bold mb-1 text-truncate" style="max-width: 180px;" title="${safeName}">${safeName}</h4>
                             <span class="badge bg-secondary-subtle text-secondary py-1 px-2 rounded small">
                                 ${user.embeddings_count} Embeddings
                             </span>
@@ -128,17 +191,20 @@ function renderUsersGrid(users) {
                             <i class="bi bi-calendar-event me-2"></i>
                             <span>Registered:</span>
                         </div>
-                        <span class="text-light fw-medium small">${user.registration_date}</span>
+                        <span class="text-light fw-medium small">${escapeHtml(user.registration_date)}</span>
                     </div>
                 </div>
                 
                 <div>
-                    <button type="button" class="btn btn-outline-danger w-100 py-2.5 rounded border border-danger border-opacity-50" onclick="triggerDelete('${user.name}')">
+                    <button type="button" class="btn btn-outline-danger w-100 py-2 rounded border border-danger border-opacity-50 delete-btn">
                         <i class="bi bi-trash3 me-1"></i>Delete Profile
                     </button>
                 </div>
             </div>
         `;
+        
+        // Attach click handler safely (avoids inline onclick with unescaped names)
+        col.querySelector('.delete-btn').addEventListener('click', () => triggerDelete(user.name));
         
         usersGrid.appendChild(col);
     });
@@ -156,15 +222,17 @@ function executeDelete() {
     deleteModal.hide();
     usersLoading.style.display = 'block';
     usersGrid.classList.add('d-none');
+    noResults.classList.add('d-none');
     
-    fetch(`/api/users/${deleteTarget}`, {
+    fetch(`/api/users/${encodeURIComponent(deleteTarget)}`, {
         method: 'DELETE'
     })
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
-            showToast(`Profile ${deleteTarget} deleted successfully.`, 'success');
+            showToast(`Profile "${deleteTarget}" deleted successfully.`, 'success');
             deleteTarget = '';
+            searchInput.value = '';
             loadUsers();
         } else {
             showToast(data.message || 'Failed to delete profile.', 'danger');
@@ -173,7 +241,7 @@ function executeDelete() {
     })
     .catch(err => {
         console.error(err);
-        showToast('Error connecting to deletion server.', 'danger');
+        showToast('Error connecting to server.', 'danger');
         loadUsers();
     });
 }

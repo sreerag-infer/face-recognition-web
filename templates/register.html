@@ -117,6 +117,7 @@
 let stream = null;
 let captureInterval = null;
 let isRegistering = false;
+let inflight = false;
 let currentName = '';
 
 const video = document.getElementById('webcam');
@@ -274,7 +275,8 @@ function startCaptureLoop() {
 }
 
 function captureFrame() {
-    if (!isRegistering) return;
+    if (!isRegistering || inflight) return;
+    inflight = true;
     
     // Draw current video frame to canvas
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -312,6 +314,9 @@ function captureFrame() {
     .catch(err => {
         console.error(err);
         updateStatus('Network connection error.', 'danger', false);
+    })
+    .finally(() => {
+        inflight = false;
     });
 }
 
