@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="row g-4">
+            
+            <!-- Left Panel: Webcam Capture -->
+            <div class="col-md-7">
+                <div class="glass-panel p-4 h-100 text-center d-flex flex-column justify-content-between">
+                    <div>
+                        <h3 class="fw-bold mb-3">Webcam Live Preview</h3>
+                        <p class="text-muted small">Position your face inside the overlay guide. Ensure good lighting and hold still.</p>
+                    </div>
+                    
+                    <div class="webcam-wrapper my-3">
+                        <!-- Webcam preview video -->
+                        <video id="webcam" class="webcam-video" autoplay playsinline muted></video>
+                        
+                        <!-- Canvas overlay for guide and capture visual feedback -->
+                        <div class="webcam-overlay">
+                            <div class="face-guide" id="faceGuide"></div>
+                            <div class="scan-line" id="scanLine" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Section -->
+                    <div class="progress-container px-3" id="progressArea" style="display: none;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted fw-medium" id="progressText">Captured 0/5</span>
+                            <span class="text-primary fw-bold" id="progressPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-bar-fill" id="progressBar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Registration Controls -->
+            <div class="col-md-5">
+                <div class="glass-panel p-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <h3 class="fw-bold mb-3">Registration Form</h3>
+                        <p class="text-muted small mb-4">Provide a unique profile name to enroll a new face signature into the system database.</p>
+                        
+                        <!-- Name Input Form -->
+                        <div class="mb-4" id="formGroup">
+                            <label for="personName" class="form-label fw-semibold">Person Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-transparent border-secondary text-muted">
+                                    <i class="bi bi-person-fill"></i>
+                                </span>
+                                <input type="text" class="form-control border-secondary bg-transparent text-light" id="personName" placeholder="Enter name (e.g. John_Doe)" required>
+                            </div>
+                            <div class="form-text text-muted">Use alphanumeric characters and underscores only.</div>
+                        </div>
+                        
+                        <!-- Status Panel -->
+                        <div class="alert alert-info border-0 mb-4 bg-opacity-10 d-none" id="statusAlert" role="alert">
+                            <div class="d-flex">
+                                <div class="me-2" id="alertSpinner">
+                                    <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+                                </div>
+                                <div class="me-2" id="alertIcon" style="display: none;">
+                                    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                                </div>
+                                <span id="statusMessage">Initializing camera...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Control Buttons -->
+                    <div class="d-grid gap-2">
+                        <button type="button" id="btnStart" class="btn btn-primary-custom py-3">
+                            <i class="bi bi-camera-fill me-2"></i>Start Registration
+                        </button>
+                        <button type="button" id="btnCancel" class="btn btn-secondary-custom py-3" style="display: none;">
+                            <i class="bi bi-x-circle me-2"></i>Cancel Registration
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- Offscreen Canvas for Frame Capture -->
+<canvas id="captureCanvas" style="display: none;"></canvas>
+
+<!-- Overwrite Modal -->
+<div class="modal fade" id="overwriteModal" tabindex="-1" aria-labelledby="overwriteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-panel border border-secondary text-light">
+            <div class="modal-header border-bottom border-secondary bg-transparent">
+                <h5 class="modal-title fw-bold text-warning" id="overwriteModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Profile Overwrite Warning
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-content-body p-4">
+                <p>A profile named <strong id="overwriteName" class="text-primary"></strong> already exists in the system database.</p>
+                <p class="mb-0 text-muted small">Registering this person again will completely overwrite their existing face signature and sample images. Do you want to proceed?</p>
+            </div>
+            <div class="modal-footer border-top border-secondary bg-transparent">
+                <button type="button" class="btn btn-secondary-custom py-2" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btnConfirmOverwrite" class="btn btn-warning py-2 text-dark fw-semibold px-4">Overwrite</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+let captureInterval = null;
+let isRegistering = false;
+let currentName = '';
+
+const video = document.getElementById('webcam');
+const canvas = document.getElementById('captureCanvas');
+const ctx = canvas.getContext('2d');
+
+const btnStart = document.getElementById('btnStart');
+const btnCancel = document.getElementById('btnCancel');
+const personNameInput = document.getElementById('personName');
+const formGroup = document.getElementById('formGroup');
+
+const progressArea = document.getElementById('progressArea');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+const progressPercentage = document.getElementById('progressPercentage');
+
+const statusAlert = document.getElementById('statusAlert');
+const statusMessage = document.getElementById('statusMessage');
+const alertSpinner = document.getElementById('alertSpinner');
+const alertIcon = document.getElementById('alertIcon');
+const faceGuide = document.getElementById('faceGuide');
+const scanLine = document.getElementById('scanLine');
+
+const overwriteModal = new bootstrap.Modal(document.getElementById('overwriteModal'));
+const overwriteNameSpan = document.getElementById('overwriteName');
+const btnConfirmOverwrite = document.getElementById('btnConfirmOverwrite');
+
+btnStart.addEventListener('click', startRegistrationFlow);
+btnCancel.addEventListener('click', stopRegistration);
+btnConfirmOverwrite.addEventListener('click', () => {
+    overwriteModal.hide();
+    startCameraAndRegistration();
+});
+
+// Clean up camera stream on navigate away
+window.addEventListener('beforeunload', () => {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+
+function updateStatus(message, type = 'info', loading = true) {
+    statusAlert.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-danger', 'alert-success');
+    statusAlert.classList.add(`alert-${type}`);
+    statusMessage.textContent = message;
+    
+    if (loading) {
+        alertSpinner.style.display = 'block';
+        alertIcon.style.display = 'none';
+    } else {
+        alertSpinner.style.display = 'none';
+        alertIcon.style.display = 'block';
+        
+        if (type === 'warning') {
+            alertIcon.querySelector('i').className = 'bi bi-exclamation-triangle-fill text-warning';
+        } else if (type === 'danger') {
+            alertIcon.querySelector('i').className = 'bi bi-x-circle-fill text-danger';
+        } else if (type === 'success') {
+            alertIcon.querySelector('i').className = 'bi bi-check-circle-fill text-success';
+        }
+    }
+}
+
+function startRegistrationFlow() {
+    const name = personNameInput.value.trim();
+    if (!name) {
+        showToast('Please enter a valid person name.', 'warning');
+        return;
+    }
+    
+    // Validate clean name (alphanumeric and underscores)
+    const cleanNamePattern = /^[a-zA-Z0-9_]+$/;
+    if (!cleanNamePattern.test(name)) {
+        showToast('Name can only contain letters, numbers, and underscores.', 'warning');
+        return;
+    }
+    
+    currentName = name;
+    
+    // Check if the user already exists in the backend
+    updateStatus('Checking user profile status...', 'info', true);
+    statusAlert.classList.remove('d-none');
+    
+    fetch('/api/register/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: currentName })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (data.already_exists) {
+                // Trigger warning modal
+                overwriteNameSpan.textContent = currentName;
+                overwriteModal.show();
+            } else {
+                startCameraAndRegistration();
+            }
+        } else {
+            updateStatus(data.message || 'Error checking profile.', 'danger', false);
+            showToast(data.message || 'Error occurred.', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('Failed to connect to backend server.', 'danger', false);
+    });
+}
+
+function startCameraAndRegistration() {
+    updateStatus('Initializing webcam capture...', 'info', true);
+    
+    // Ask for webcam permissions
+    navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+        audio: false
+    })
+    .then(mediaStream => {
+        stream = mediaStream;
+        video.srcObject = stream;
+        
+        // Disable name input and swap start button for cancel
+        isRegistering = true;
+        personNameInput.disabled = true;
+        btnStart.style.display = 'none';
+        btnCancel.style.display = 'block';
+        progressArea.style.display = 'block';
+        scanLine.style.display = 'block';
+        faceGuide.style.borderColor = 'var(--secondary-color)';
+        
+        // Reset progress bar
+        updateProgress(0);
+        
+        updateStatus('Camera active. Collecting face samples...', 'info', true);
+        
+        // Wait for video metadata to set canvas dimensions
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            // Begin capture loop
+            startCaptureLoop();
+        };
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('Camera not available or permission denied.', 'danger', false);
+        showToast('Webcam access is required for registration.', 'danger');
+        stopRegistration();
+    });
+}
+
+function startCaptureLoop() {
+    // Send frame to backend every 600ms
+    captureInterval = setInterval(captureFrame, 600);
+}
+
+function captureFrame() {
+    if (!isRegistering) return;
+    
+    // Draw current video frame to canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Get base64 JPEG from canvas
+    const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+    
+    // Post to frame endpoint
+    fetch('/api/register/frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: currentName, image: imageBase64 })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            updateProgress(data.count);
+            updateStatus(data.message, 'success', true);
+            faceGuide.style.borderColor = 'var(--accent-success)';
+            
+            // Flash guide green momentarily
+            setTimeout(() => {
+                if (isRegistering) faceGuide.style.borderColor = 'var(--secondary-color)';
+            }, 300);
+            
+            if (data.count >= 5) {
+                finishRegistration();
+            }
+        } else {
+            // Quality check failures, multiple faces, or no face
+            updateStatus(data.message, 'warning', false);
+            faceGuide.style.borderColor = 'var(--accent-warning)';
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('Network connection error.', 'danger', false);
+    });
+}
+
+function updateProgress(count) {
+    const percentage = Math.min((count / 5) * 100, 100);
+    progressBar.style.width = `${percentage}%`;
+    progressText.textContent = `Captured ${count}/5`;
+    progressPercentage.textContent = `${Math.round(percentage)}%`;
+}
+
+function finishRegistration() {
+    clearInterval(captureInterval);
+    updateStatus('Finalizing face signature...', 'info', true);
+    
+    fetch('/api/register/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: currentName })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            updateStatus(data.message, 'success', false);
+            showToast(`Registration complete for ${currentName}!`, 'success');
+            
+            // Success flash effect
+            faceGuide.style.borderColor = 'var(--accent-success)';
+            faceGuide.style.boxShadow = '0 0 25px var(--accent-success)';
+            
+            setTimeout(() => {
+                stopRegistration();
+                window.location.href = '/users';
+            }, 2000);
+        } else {
+            updateStatus(data.message || 'Registration failed to finish.', 'danger', false);
+            showToast(data.message || 'Error saving embeddings.', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('Failed to complete registration.', 'danger', false);
+    });
+}
+
+function stopRegistration() {
+    isRegistering = false;
+    clearInterval(captureInterval);
+    
+    // Stop video tracks
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    
+    video.srcObject = null;
+    scanLine.style.display = 'none';
+    faceGuide.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+    faceGuide.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.5)';
+    
+    // Call cancel endpoint to clean up session
+    if (currentName) {
+        fetch('/api/register/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: currentName })
+        }).catch(err => console.error('Error cancelling:', err));
+    }
+    
+    // Restore UI controls
+    personNameInput.disabled = false;
+    btnStart.style.display = 'block';
+    btnCancel.style.display = 'none';
+    progressArea.style.display = 'none';
+    statusAlert.classList.add('d-none');
+    
+    currentName = '';
+}
+</script>
+{% endblock %}

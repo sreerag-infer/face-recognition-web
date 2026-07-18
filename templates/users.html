@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-5">
+    <div class="col-md-8">
+        <h1 class="display-5 fw-bold mb-2">Registered Profiles</h1>
+        <p class="lead text-muted">Manage security profiles enrolled in the database. Deleting a profile completely cleanses npy embeddings and sample images.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom px-4 py-2">
+            <i class="bi bi-person-plus-fill me-2"></i>Enroll New Profile
+        </a>
+    </div>
+</div>
+
+<!-- Loading state spinner -->
+<div class="text-center py-5" id="usersLoading">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading profiles...</span>
+    </div>
+    <p class="text-muted mt-3">Accessing database files...</p>
+</div>
+
+<!-- Empty state -->
+<div class="glass-panel p-5 text-center my-4 d-none" id="emptyUsers">
+    <i class="bi bi-people display-1 text-muted mb-4 d-block"></i>
+    <h3 class="fw-bold">No Profiles Found</h3>
+    <p class="text-muted mb-4">The face database is currently empty. Get started by registering your first face signature.</p>
+    <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom px-4 py-2.5">
+        <i class="bi bi-camera-fill me-2"></i>Register Face Now
+    </a>
+</div>
+
+<!-- User Grid -->
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 d-none" id="usersGrid">
+    <!-- Dynamic Cards will be rendered here -->
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-panel border border-secondary text-light">
+            <div class="modal-header border-bottom border-secondary bg-transparent">
+                <h5 class="modal-title fw-bold text-danger" id="deleteConfirmModalLabel">
+                    <i class="bi bi-trash3-fill me-2"></i>Delete Security Profile
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-content-body p-4">
+                <p>Are you sure you want to delete <strong id="deleteTargetName" class="text-primary"></strong>?</p>
+                <p class="mb-0 text-muted small"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>This action is permanent and will delete the mean embedding, all individual embeddings, and all registration sample images for this profile.</p>
+            </div>
+            <div class="modal-footer border-top border-secondary bg-transparent">
+                <button type="button" class="btn btn-secondary-custom py-2" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btnConfirmDelete" class="btn btn-danger py-2 px-4 fw-semibold">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let deleteTarget = '';
+const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+const deleteTargetNameSpan = document.getElementById('deleteTargetName');
+const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+
+const usersLoading = document.getElementById('usersLoading');
+const emptyUsers = document.getElementById('emptyUsers');
+const usersGrid = document.getElementById('usersGrid');
+
+btnConfirmDelete.addEventListener('click', executeDelete);
+
+document.addEventListener('DOMContentLoaded', loadUsers);
+
+function loadUsers() {
+    usersLoading.style.display = 'block';
+    usersGrid.classList.add('d-none');
+    emptyUsers.classList.add('d-none');
+    
+    fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+            usersLoading.style.display = 'none';
+            
+            const users = data.users || [];
+            if (users.length === 0) {
+                emptyUsers.classList.remove('d-none');
+                return;
+            }
+            
+            renderUsersGrid(users);
+            usersGrid.classList.remove('d-none');
+        })
+        .catch(err => {
+            console.error(err);
+            usersLoading.style.display = 'none';
+            showToast('Failed to fetch registered profiles from server.', 'danger');
+        });
+}
+
+function renderUsersGrid(users) {
+    usersGrid.innerHTML = '';
+    
+    users.forEach(user => {
+        const col = document.createElement('div');
+        col.className = 'col';
+        
+        // Avatar first letter capitalized
+        const initial = user.name.charAt(0).toUpperCase();
+        
+        col.innerHTML = `
+            <div class="glass-panel p-4 h-100 d-flex flex-column justify-content-between user-card">
+                <div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="user-avatar me-3">${initial}</div>
+                        <div>
+                            <h4 class="fw-bold mb-1 text-truncate" style="max-width: 180px;" title="${user.name}">${user.name}</h4>
+                            <span class="badge bg-secondary-subtle text-secondary py-1 px-2 rounded small">
+                                ${user.embeddings_count} Embeddings
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-top border-secondary border-opacity-25 pt-3 my-3">
+                        <div class="d-flex text-muted small mb-1 align-items-center">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            <span>Registered:</span>
+                        </div>
+                        <span class="text-light fw-medium small">${user.registration_date}</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <button type="button" class="btn btn-outline-danger w-100 py-2.5 rounded border border-danger border-opacity-50" onclick="triggerDelete('${user.name}')">
+                        <i class="bi bi-trash3 me-1"></i>Delete Profile
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        usersGrid.appendChild(col);
+    });
+}
+
+function triggerDelete(name) {
+    deleteTarget = name;
+    deleteTargetNameSpan.textContent = name;
+    deleteModal.show();
+}
+
+function executeDelete() {
+    if (!deleteTarget) return;
+    
+    deleteModal.hide();
+    usersLoading.style.display = 'block';
+    usersGrid.classList.add('d-none');
+    
+    fetch(`/api/users/${deleteTarget}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast(`Profile ${deleteTarget} deleted successfully.`, 'success');
+            deleteTarget = '';
+            loadUsers();
+        } else {
+            showToast(data.message || 'Failed to delete profile.', 'danger');
+            loadUsers();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Error connecting to deletion server.', 'danger');
+        loadUsers();
+    });
+}
+</script>
+{% endblock %}

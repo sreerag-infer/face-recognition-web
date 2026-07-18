@@ -1,0 +1,332 @@
+/* Custom Design System for Face Registration & Recognition */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --primary-color: #4f46e5;      /* Indigo */
+    --primary-hover: #4338ca;
+    --secondary-color: #0ea5e9;    /* Sky Blue */
+    --accent-success: #10b981;     /* Emerald */
+    --accent-danger: #ef4444;      /* Red */
+    --accent-warning: #f59e0b;     /* Amber */
+    
+    --bg-gradient: radial-gradient(circle at top left, #f8fafc, #f1f5f9 60%, #e2e8f0);
+    --card-bg: rgba(255, 255, 255, 0.75);
+    --card-border: rgba(226, 232, 240, 0.8);
+    --text-color: #0f172a;
+    --text-muted: #64748b;
+    --nav-bg: rgba(255, 255, 255, 0.8);
+    --footer-bg: #ffffff;
+    
+    --border-radius: 16px;
+    --glow-shadow: 0 8px 30px rgba(79, 70, 229, 0.12);
+    --button-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
+}
+
+[data-bs-theme="dark"] {
+    --bg-gradient: radial-gradient(circle at top left, #0f172a, #020617 70%, #000000);
+    --card-bg: rgba(15, 23, 42, 0.65);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text-color: #f8fafc;
+    --text-muted: #94a3b8;
+    --nav-bg: rgba(15, 23, 42, 0.8);
+    --footer-bg: #090d16;
+    
+    --glow-shadow: 0 8px 30px rgba(99, 102, 241, 0.25);
+    --button-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-gradient);
+    color: var(--text-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.4s ease, color 0.4s ease;
+    overflow-x: hidden;
+}
+
+/* Glassmorphism Class */
+.glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius);
+    box-shadow: var(--glow-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-panel:hover {
+    box-shadow: 0 12px 40px rgba(79, 70, 229, 0.18);
+}
+
+/* Navigation Bar */
+.navbar-custom {
+    background: var(--nav-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--card-border);
+    transition: all 0.3s ease;
+}
+
+.navbar-brand {
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-link {
+    font-weight: 500;
+    color: var(--text-color) !important;
+    opacity: 0.75;
+    transition: opacity 0.2s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.nav-link:hover, .nav-link.active {
+    opacity: 1;
+    color: var(--primary-color) !important;
+}
+
+.nav-link.active {
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* Dashboard Cards */
+.hero-card {
+    height: 100%;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hero-icon-container {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--button-shadow);
+}
+
+/* Buttons */
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.75rem;
+    border-radius: 12px;
+    box-shadow: var(--button-shadow);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    opacity: 0.95;
+    color: white;
+}
+
+.btn-primary-custom:active {
+    transform: translateY(0);
+}
+
+.btn-secondary-custom {
+    background: transparent;
+    border: 1.5px solid var(--text-muted);
+    color: var(--text-color);
+    font-weight: 600;
+    padding: 0.75rem 1.75rem;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary-custom:hover {
+    background: var(--text-color);
+    color: var(--footer-bg);
+    border-color: var(--text-color);
+}
+
+/* Dark Mode Switch */
+.theme-toggle-btn {
+    border: none;
+    background: transparent;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-color);
+    opacity: 0.8;
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle-btn:hover {
+    transform: rotate(20deg);
+    opacity: 1;
+}
+
+/* Webcam Container */
+.webcam-wrapper {
+    position: relative;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+    max-width: 640px;
+    margin: 0 auto;
+    border: 3px solid var(--card-border);
+    box-shadow: var(--glow-shadow);
+}
+
+.webcam-video, .webcam-canvas, .webcam-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.webcam-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Scan line animation */
+.scan-line {
+    position: absolute;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(to right, transparent, var(--secondary-color), transparent);
+    opacity: 0.7;
+    animation: scanAnimation 3s linear infinite;
+}
+
+@keyframes scanAnimation {
+    0% {
+        top: 0%;
+    }
+    50% {
+        top: 100%;
+    }
+    100% {
+        top: 0%;
+    }
+}
+
+/* Glowing face guide */
+.face-guide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    height: 60%;
+    border: 2px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+}
+
+/* Progress indicator styles */
+.progress-container {
+    margin-top: 1.5rem;
+}
+
+.progress-bar-custom {
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--card-border);
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    width: 0%;
+    transition: width 0.4s ease;
+}
+
+/* Users List Cards */
+.user-card {
+    transition: all 0.3s ease;
+    border: 1px solid var(--card-border);
+}
+
+.user-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(79, 70, 229, 0.15);
+}
+
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Footer */
+footer {
+    background: var(--footer-bg);
+    border-top: 1px solid var(--card-border);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 1.5rem 0;
+    margin-top: auto;
+    transition: background 0.4s ease;
+}
+
+/* Toast styling */
+.toast-container {
+    z-index: 1100;
+}
+
+.toast {
+    background: var(--card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--card-border) !important;
+    color: var(--text-color) !important;
+}
+
+/* Pulse Animation */
+.pulse-recording {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: var(--accent-danger);
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}

@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-11">
+        <div class="row g-4">
+            
+            <!-- Left Column: Video Feed -->
+            <div class="col-md-7">
+                <div class="glass-panel p-4 h-100 text-center d-flex flex-column justify-content-between">
+                    <div>
+                        <h3 class="fw-bold mb-3">Live Recognition Feed</h3>
+                        <p class="text-muted small">The feed displays bounding boxes and match labels computed by the backend model.</p>
+                    </div>
+                    
+                    <div class="webcam-wrapper my-3">
+                        <!-- Hidden video element for pulling camera frames -->
+                        <video id="webcam" style="display: none;" autoplay playsinline muted></video>
+                        
+                        <!-- Image element rendering annotated frames -->
+                        <img id="feedDisplay" class="webcam-img" src="" alt="Webcam Feed" style="display: none;">
+                        
+                        <!-- Overlay elements when scanner is idle -->
+                        <div class="webcam-overlay" id="idleOverlay">
+                            <div class="position-absolute top-50 start-50 translate-middle text-center">
+                                <i class="bi bi-camera-video-off-fill display-3 text-muted mb-3 d-block"></i>
+                                <span class="text-muted fw-semibold">Camera is Offline</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scanner state toggle -->
+                    <div class="d-flex justify-content-center gap-3">
+                        <button type="button" id="btnStart" class="btn btn-primary-custom px-4 py-2">
+                            <i class="bi bi-play-fill me-1"></i>Start Recognition
+                        </button>
+                        <button type="button" id="btnStop" class="btn btn-secondary-custom px-4 py-2" style="display: none;">
+                            <i class="bi bi-stop-fill me-1"></i>Stop Recognition
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Recognition Logs & System Status -->
+            <div class="col-md-5">
+                <div class="glass-panel p-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <h3 class="fw-bold mb-3">Detection Sidebar</h3>
+                        <p class="text-muted small mb-4">Real-time log of faces currently visible in the webcam stream.</p>
+                        
+                        <!-- System status box -->
+                        <div class="alert alert-secondary border-0 mb-4 bg-opacity-10 d-none" id="statusAlert" role="alert">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm text-secondary me-2" id="alertSpinner" role="status"></div>
+                                <span id="statusMessage">Processing frames...</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Detected Users List -->
+                        <h5 class="fw-bold mb-3 text-uppercase fs-6 tracking-wide">Visible Persons</h5>
+                        <div class="list-group list-group-flush border border-secondary rounded overflow-hidden" id="detectionsList">
+                            <div class="list-group-item bg-transparent text-muted text-center py-4 fs-6" id="emptyDetections">
+                                <i class="bi bi-info-circle me-1"></i>No active detections
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Performance stats box -->
+                    <div class="mt-4 border-top border-secondary pt-3">
+                        <div class="row text-center text-muted small g-2">
+                            <div class="col-6 border-end border-secondary">
+                                <span class="d-block text-uppercase fw-bold fs-7">Frame Delay</span>
+                                <span class="fs-6 fw-semibold text-light" id="statLatency">-</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="d-block text-uppercase fw-bold fs-7">Matching Threshold</span>
+                                <span class="fs-6 fw-semibold text-light">0.55</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- Offscreen Canvas for Image Serialization -->
+<canvas id="captureCanvas" style="display: none;"></canvas>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+let captureInterval = null;
+let isScanning = false;
+let lastToastedNames = new Set();
+let toastCooldownTimeout = null;
+
+const video = document.getElementById('webcam');
+const feedDisplay = document.getElementById('feedDisplay');
+const idleOverlay = document.getElementById('idleOverlay');
+const canvas = document.getElementById('captureCanvas');
+const ctx = canvas.getContext('2d');
+
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+
+const statusAlert = document.getElementById('statusAlert');
+const statusMessage = document.getElementById('statusMessage');
+const alertSpinner = document.getElementById('alertSpinner');
+
+const detectionsList = document.getElementById('detectionsList');
+const emptyDetections = document.getElementById('emptyDetections');
+const statLatency = document.getElementById('statLatency');
+
+btnStart.addEventListener('click', startRecognition);
+btnStop.addEventListener('click', stopRecognition);
+
+// Clean up camera stream on navigate away
+window.addEventListener('beforeunload', () => {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+
+function updateStatus(message, loading = true) {
+    statusAlert.classList.remove('d-none');
+    statusMessage.textContent = message;
+    
+    if (loading) {
+        alertSpinner.style.display = 'block';
+    } else {
+        alertSpinner.style.display = 'none';
+    }
+}
+
+function startRecognition() {
+    updateStatus('Connecting to webcam...', true);
+    
+    // Acquire webcam feed
+    navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+        audio: false
+    })
+    .then(mediaStream => {
+        stream = mediaStream;
+        video.srcObject = stream;
+        
+        btnStart.style.display = 'none';
+        btnStop.style.display = 'block';
+        idleOverlay.style.display = 'none';
+        feedDisplay.style.display = 'block';
+        isScanning = true;
+        
+        updateStatus('Webcam active. Initializing AI engine...', true);
+        
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            // Begin continuous loop
+            startCaptureLoop();
+        };
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('Failed to connect to camera.', false);
+        showToast('Camera not available or access denied.', 'danger');
+        stopRecognition();
+    });
+}
+
+function startCaptureLoop() {
+    // Process a frame every 300ms for responsiveness
+    captureInterval = setInterval(sendFrameToBackend, 300);
+}
+
+function sendFrameToBackend() {
+    if (!isScanning) return;
+    
+    // Render current frame to hidden canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Base64 JPEG data URL
+    const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+    
+    const startTime = performance.now();
+    
+    // Post to recognition API
+    fetch('/api/recognize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageBase64 })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const endTime = performance.now();
+        const latency = Math.round(endTime - startTime);
+        statLatency.textContent = `${latency} ms`;
+        
+        if (data.error) {
+            updateStatus(`Engine error: ${data.error}`, false);
+            return;
+        }
+        
+        // Render the annotated frame
+        feedDisplay.src = data.image;
+        
+        // Update detected faces panel
+        renderDetectedFaces(data.faces);
+        updateStatus('Inference streaming online.', false);
+    })
+    .catch(err => {
+        console.error(err);
+        updateStatus('API connection timeout.', false);
+    });
+}
+
+function renderDetectedFaces(faces) {
+    // Clear list
+    detectionsList.innerHTML = '';
+    
+    if (!faces || faces.length === 0) {
+        detectionsList.appendChild(emptyDetections);
+        return;
+    }
+    
+    // Track faces to potentially toast
+    const currentRecognizedNames = [];
+
+    faces.forEach(face => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 border-secondary border-bottom';
+        
+        const isKnown = face.name !== 'Unknown';
+        const colorClass = isKnown ? 'text-success' : 'text-danger';
+        const iconClass = isKnown ? 'bi-patch-check-fill' : 'bi-question-circle-fill';
+        const confPct = Math.round(face.confidence * 100);
+        
+        item.innerHTML = `
+            <div>
+                <i class="bi ${iconClass} ${colorClass} me-2 fs-5"></i>
+                <span class="fw-bold text-light">${face.name}</span>
+            </div>
+            <div>
+                <span class="badge ${isKnown ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2 py-1.5 rounded">
+                    Confidence: ${confPct}%
+                </span>
+            </div>
+        `;
+        
+        detectionsList.appendChild(item);
+        
+        if (isKnown) {
+            currentRecognizedNames.push(face.name);
+        }
+    });
+
+    // Notify/Toast newly recognized users (cooldown protects from flooding)
+    currentRecognizedNames.forEach(name => {
+        if (!lastToastedNames.has(name)) {
+            showToast(`Recognized profile: ${name}`, 'success', 'Verification Success');
+            lastToastedNames.add(name);
+            
+            // Set cooldown refresh
+            if (toastCooldownTimeout) clearTimeout(toastCooldownTimeout);
+            toastCooldownTimeout = setTimeout(() => {
+                lastToastedNames.clear();
+            }, 10000); // 10 seconds cooldown
+        }
+    });
+}
+
+function stopRecognition() {
+    isScanning = false;
+    clearInterval(captureInterval);
+    
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    
+    video.srcObject = null;
+    feedDisplay.src = '';
+    feedDisplay.style.display = 'none';
+    idleOverlay.style.display = 'block';
+    
+    btnStart.style.display = 'block';
+    btnStop.style.display = 'none';
+    statusAlert.classList.add('d-none');
+    
+    detectionsList.innerHTML = '';
+    detectionsList.appendChild(emptyDetections);
+    statLatency.textContent = '-';
+}
+</script>
+{% endblock %}

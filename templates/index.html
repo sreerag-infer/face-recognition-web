@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-5">
+    <div class="col-md-8">
+        <h1 class="display-4 fw-bold mb-2">Security Dashboard</h1>
+        <p class="lead text-muted">Manage user registration and real-time face recognition with high-performance AI inference.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <span class="badge bg-success-subtle text-success fs-6 py-2 px-3 border border-success-subtle">
+            <span class="pulse-recording"></span>System Online
+        </span>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-5 g-4">
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted fw-medium">Registered Profiles</span>
+                <span class="fs-4 text-primary"><i class="bi bi-people-fill"></i></span>
+            </div>
+            <h2 class="display-6 fw-bold mb-1" id="statUsersCount">-</h2>
+            <p class="small text-muted mb-0">Total active face signatures in embeddings database.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted fw-medium">Inference Accelerator</span>
+                <span class="fs-4 text-info"><i class="bi bi-cpu-fill"></i></span>
+            </div>
+            <h2 class="fs-2 fw-bold mb-1" id="statProvider">-</h2>
+            <p class="small text-muted mb-0">CUDA / CPU execution backend details.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted fw-medium">Matching Threshold</span>
+                <span class="fs-4 text-warning"><i class="bi bi-sliders"></i></span>
+            </div>
+            <h2 class="display-6 fw-bold mb-1">0.55</h2>
+            <p class="small text-muted mb-0">Cosine distance cutoff for face validation checks.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Main Action Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-6">
+        <div class="glass-panel hero-card">
+            <div>
+                <div class="hero-icon-container">
+                    <i class="bi bi-person-plus-fill"></i>
+                </div>
+                <h3 class="fw-bold mb-3">Face Registration</h3>
+                <p class="text-muted mb-4">
+                    Register a new user profile by capturing live video frames. The system performs automatic sharpness and brightness quality tests, selecting the best 5 samples to construct a high-accuracy mean face embedding signature.
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('register_page') }}" class="btn btn-primary-custom w-100 d-flex justify-content-center align-items-center py-3">
+                    Start Registration <i class="bi bi-arrow-right-short ms-2 fs-5"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-panel hero-card">
+            <div>
+                <div class="hero-icon-container" style="background: linear-gradient(135deg, var(--secondary-color), var(--accent-success));">
+                    <i class="bi bi-eye-fill"></i>
+                </div>
+                <h3 class="fw-bold mb-3">Face Recognition</h3>
+                <p class="text-muted mb-4">
+                    Run real-time facial recognition via browser webcam stream. Send frames to the backend to compare face signatures against registered profiles. Bounding boxes and recognition distance confidence are overlaid instantly.
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('recognize_page') }}" class="btn btn-primary-custom w-100 d-flex justify-content-center align-items-center py-3" style="background: linear-gradient(135deg, var(--secondary-color), var(--accent-success)); box-shadow: 0 4px 14px rgba(14, 165, 233, 0.2);">
+                    Start Recognition <i class="bi bi-arrow-right-short ms-2 fs-5"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Fetch dashboard statistics
+        fetch('/api/status')
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'ok') {
+                    document.getElementById('statUsersCount').textContent = data.users_count;
+                    
+                    // Display friendly accelerator backend name
+                    const providers = data.providers || [];
+                    if (providers.includes('CUDAExecutionProvider')) {
+                        document.getElementById('statProvider').textContent = 'NVIDIA CUDA (GPU)';
+                    } else {
+                        document.getElementById('statProvider').textContent = 'CPU (Standard)';
+                    }
+                } else {
+                    showToast('Failed to fetch system status.', 'danger');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showToast('Unable to connect to system API.', 'danger');
+            });
+    });
+</script>
+{% endblock %}

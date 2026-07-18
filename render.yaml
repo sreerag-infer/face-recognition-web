@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: face-shield-ai
+    runtime: docker
+    plan: free
+    envVars:
+      - key: PORT
+        value: 80
+      - key: PYTHONUNBUFFERED
+        value: 1
+    disk:
+      name: face-data
+      mountPath: /app/embeddings
+      sizeGB: 1

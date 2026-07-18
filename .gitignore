@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+reco/
+venv/
+env/
+.venv/
+
+# VS Code
+.vscode/
+
+# Python env
+.env
+
+# Uploaded files
+uploads/
+
+# Registration images
+registration_samples/
+
+# Embeddings (optional)
+embeddings/
+
+# OS
+Thumbs.db
+.DS_Store
