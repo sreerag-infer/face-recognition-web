@@ -22,10 +22,9 @@ RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download InsightFace model DURING IMAGE BUILD
-RUN mkdir -p /root/.insightface/models && \
+RUN mkdir -p /root/.insightface/models/buffalo_s && \
     wget -O /tmp/buffalo_s.zip https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_s.zip && \
-    unzip -l /tmp/buffalo_s.zip && \
-    unzip /tmp/buffalo_s.zip -d /root/.insightface/models && \
+    unzip /tmp/buffalo_s.zip -d /root/.insightface/models/buffalo_s && \
     rm /tmp/buffalo_s.zip
 # Copy project
 COPY . .
