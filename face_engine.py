@@ -58,6 +58,7 @@ class FaceEngine:
 
         self.model = insightface.app.FaceAnalysis(
             name="buffalo_s",
+            root="./models",
             providers=providers
         )
         logger.info("Preparing InsightFace model...")
