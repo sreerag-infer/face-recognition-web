@@ -41,30 +41,22 @@ class FaceEngine:
         # Thread safety lock for model inference
         self._lock = threading.Lock()
 
-        # Load InsightFace Model
-        logger.info("Initializing InsightFace model (buffalo_s)...")
-        import onnxruntime as ort
-
-        available = ort.get_available_providers()
-
-        if "CUDAExecutionProvider" in available:
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            ctx_id = 0
-        else:
-            providers = ["CPUExecutionProvider"]
-            ctx_id = -1
-
-        logger.info("Using providers: %s", providers)
+        logger.info("Creating FaceAnalysis object")
 
         self.model = insightface.app.FaceAnalysis(
             name="buffalo_s",
             providers=providers
         )
+
+        logger.info("FaceAnalysis object created")
+
         logger.info("Preparing InsightFace model...")
+
         self.model.prepare(
             ctx_id=ctx_id,
             det_size=(320, 320)
         )
+
         logger.info("InsightFace model initialized successfully.")
 
         # Load database
