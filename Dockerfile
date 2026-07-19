@@ -32,6 +32,6 @@ COPY . .
 # Runtime folders
 RUN mkdir -p uploads embeddings registration_samples
 
-EXPOSE 5000
+EXPOSE 10000
 
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
